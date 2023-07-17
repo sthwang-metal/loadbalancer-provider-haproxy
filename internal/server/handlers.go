@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -9,6 +10,8 @@ import (
 
 	"go.infratographer.com/x/events"
 	"go.infratographer.com/x/gidx"
+
+	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 
 	"go.infratographer.com/loadbalancer-provider-haproxy/internal/loadbalancer"
 )
@@ -21,6 +24,8 @@ func (s *Server) ProcessChange(messages <-chan *message.Message) {
 		if err != nil {
 			s.Logger.Errorw("unable to unmarshal change message", "error", err, "messageID", msg.UUID, "message", msg.Payload)
 			msg.Nack()
+
+			continue
 		}
 
 		if slices.ContainsFunc(m.AdditionalSubjectIDs, s.LocationCheck) || len(s.Locations) == 0 {
@@ -28,7 +33,16 @@ func (s *Server) ProcessChange(messages <-chan *message.Message) {
 				lb, err = loadbalancer.NewLoadBalancer(s.Context, s.Logger, s.APIClient, m.SubjectID, m.AdditionalSubjectIDs)
 				if err != nil {
 					s.Logger.Errorw("unable to initialize loadbalancer", "error", err, "messageID", msg.UUID, "message", msg.Payload)
-					msg.Nack()
+
+					if errors.Is(err, lbapi.ErrLBNotfound) {
+						// ack and ignore
+						msg.Ack()
+					} else {
+						// nack and retry
+						msg.Nack()
+					}
+
+					continue
 				}
 			} else {
 				lb = &loadbalancer.LoadBalancer{
@@ -37,7 +51,7 @@ func (s *Server) ProcessChange(messages <-chan *message.Message) {
 				}
 			}
 
-			if lb.LbType != loadbalancer.TypeNoLB {
+			if lb != nil && lb.LbType != loadbalancer.TypeNoLB {
 				switch {
 				case m.EventType == string(events.CreateChangeType) && lb.LbType == loadbalancer.TypeLB:
 					s.Logger.Debugw("requesting address for loadbalancer", "loadbalancer", lb.LoadBalancerID.String())
