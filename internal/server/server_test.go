@@ -22,6 +22,8 @@ func TestRun(t *testing.T) {
 	api := mock.DummyAPI(id.String())
 	api.Start()
 
+	conn, _ := events.NewNATSConnection(nats.Config.NATS)
+
 	eSrv, _ := echox.NewServer(zap.NewNop(), echox.Config{}, nil)
 
 	config := events.Config{
