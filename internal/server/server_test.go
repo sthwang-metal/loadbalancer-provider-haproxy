@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.infratographer.com/x/echox"
+	"go.infratographer.com/x/events"
 	"go.infratographer.com/x/gidx"
 	"go.uber.org/zap"
 
@@ -21,16 +22,18 @@ func TestRun(t *testing.T) {
 	api := mock.DummyAPI(id.String())
 	api.Start()
 
+	conn, _ := events.NewNATSConnection(nats.Config.NATS)
+
 	eSrv, _ := echox.NewServer(zap.NewNop(), echox.Config{}, nil)
 
 	srv := server.Server{
-		APIClient:        lbapi.NewClient(api.URL),
-		Context:          context.TODO(),
-		Echo:             eSrv,
-		Locations:        []string{"abcd1234"},
-		Logger:           zap.NewNop().Sugar(),
-		SubscriberConfig: nats.SubscriberConfig,
-		ChangeTopics:     []string{"*.load-balancer-run"},
+		APIClient:    lbapi.NewClient(api.URL),
+		Context:      context.TODO(),
+		Echo:         eSrv,
+		Locations:    []string{"abcd1234"},
+		Logger:       zap.NewNop().Sugar(),
+		Events:       conn,
+		ChangeTopics: []string{"*.load-balancer-run"},
 	}
 
 	err := srv.Run(srv.Context)

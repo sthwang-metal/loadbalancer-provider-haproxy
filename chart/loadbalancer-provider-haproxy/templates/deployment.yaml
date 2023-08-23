@@ -40,8 +40,15 @@ spec:
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
-          {{- if .Values.provider.extraEnvVars }}
           env:
+          {{- if .Values.api.events.nats.tokenSecretName }}
+            - name: LOADBALANCERPROVIDERHAPROXY_EVENTS_NATS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.events.nats.tokenSecretName }}
+                  key: token
+          {{- end }}
+          {{- if .Values.provider.extraEnvVars }}
           {{- range .Values.provider.extraEnvVars }}
             - name: {{ .name }}
               value: {{ .value }}
@@ -61,7 +68,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - process
-          {{- range .Values.provider.events.changeTopics }}
+          {{- range .Values.provider.events.nats.changeTopics }}
             - --change-topics={{ . }}
           {{- end }}
             - --event-locations={{ .Values.provider.events.location }}
@@ -73,7 +80,7 @@ spec:
             httpGet:
               path: /livez
               port: hc
-          {{- if .Values.provider.events.auth.secretName  }}
+          {{- if .Values.provider.events.nats.credsSecretName  }}
           volumeMounts:
             - name: events-creds
               mountPath: /creds
@@ -94,9 +101,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
-        {{- if .Values.provider.events.auth.secretName  }}
+        {{- if .Values.provider.events.nats.credsSecretName  }}
         - name: events-creds
           secret:
-            secretName: "{{ .Values.provider.events.auth.secretName }}"
+            secretName: "{{ .Values.provider.events.nats.credsSecretName }}"
         {{- end }}
             

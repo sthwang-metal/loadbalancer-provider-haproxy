@@ -42,17 +42,32 @@ provider:
         issuer: ""
 
   events:
-    queueGroup: "my-queue-group"
-    connectionURL: "nats://my-events-cluster.example.com:4222"
-    auth:
-      secretName: ""
-      credsPath: "/creds"
-    topicPrefix: "com.infratographer"
-    changeTopics:
-      - "*.load-balancer"
-      - "events.create.port"
     location: ""
-
+    nats:
+      # url is the event server connection url
+      url: "nats://my-events-cluster.example.com:4222"
+      # publishPrefix is the subscribe event prefix
+      publishPrefix: "com.infratographer"
+      # subscribePrefix is the subscribe event prefix
+      subscribePrefix: "com.infratographer"
+      # queueGroup defines the events queue group
+      queueGroup: ""
+      # source defines the source of the events (defaults to application name)
+      source: ""
+      # connectTimeout is event connection timeout
+      connectTimeout: "10s"
+      # shutdownTimeout is the shutdown grace period
+      shutdownTimeout: "5s"
+      # tokenSecretName is the secret to load the auth token
+      tokenSecretName: ""
+      # credsSecretName is the secret to load the creds auth file from
+      credsSecretName: ""
+      # credsFile is the location to read the creds file from
+      credsFile: "/nats/creds"
+      # changeTopics are the topics to subscribe to
+      changeTopics:
+        - "*.load-balancer"
+        - "events.create.port"
 
 reloader:
   enabled: false

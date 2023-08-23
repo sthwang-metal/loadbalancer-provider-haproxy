@@ -3,8 +3,7 @@ package server
 import (
 	"errors"
 	"strings"
-
-	"github.com/ThreeDotsLabs/watermill/message"
+	"time"
 
 	"golang.org/x/exp/slices"
 
@@ -16,30 +15,32 @@ import (
 	"go.infratographer.com/loadbalancer-provider-haproxy/internal/loadbalancer"
 )
 
-func (s *Server) ProcessChange(messages <-chan *message.Message) {
+const nakDelay = time.Second * 10
+
+func (s *Server) ProcessChange(messages <-chan events.Message[events.ChangeMessage]) {
 	var lb *loadbalancer.LoadBalancer
 
-	for msg := range messages {
-		m, err := events.UnmarshalChangeMessage(msg.Payload)
-		if err != nil {
-			s.Logger.Errorw("unable to unmarshal change message", "error", err, "messageID", msg.UUID, "message", msg.Payload)
-			msg.Nack()
+	var err error
 
-			continue
-		}
+	for msg := range messages {
+		m := msg.Message()
 
 		if slices.ContainsFunc(m.AdditionalSubjectIDs, s.LocationCheck) || len(s.Locations) == 0 {
 			if m.EventType != string(events.DeleteChangeType) {
 				lb, err = loadbalancer.NewLoadBalancer(s.Context, s.Logger, s.APIClient, m.SubjectID, m.AdditionalSubjectIDs)
 				if err != nil {
-					s.Logger.Errorw("unable to initialize loadbalancer", "error", err, "messageID", msg.UUID, "message", msg.Payload)
+					s.Logger.Errorw("unable to initialize loadbalancer", "error", err, "messageID", msg.ID(), "message", m)
 
 					if errors.Is(err, lbapi.ErrLBNotfound) {
 						// ack and ignore
-						msg.Ack()
+						if ackErr := msg.Ack(); ackErr != nil {
+							s.Logger.Errorw("error occurred while acking", "error", ackErr)
+						}
 					} else {
 						// nack and retry
-						msg.Nack()
+						if nakErr := msg.Nak(nakDelay); nakErr != nil {
+							s.Logger.Errorw("error occurred while nacking", "error", nakErr)
+						}
 					}
 
 					continue
@@ -58,23 +59,31 @@ func (s *Server) ProcessChange(messages <-chan *message.Message) {
 
 					if err := s.processLoadBalancerChangeCreate(lb); err != nil {
 						s.Logger.Errorw("handler unable to request address for loadbalancer", "error", err, "loadbalancer", lb.LoadBalancerID.String())
-						msg.Nack()
+
+						if nakErr := msg.Nak(nakDelay); nakErr != nil {
+							s.Logger.Errorw("error occurred while nacking", "error", nakErr)
+						}
 					}
 				case m.EventType == string(events.DeleteChangeType) && lb.LbType == loadbalancer.TypeLB:
 					s.Logger.Debugw("releasing address from loadbalancer", "loadbalancer", lb.LoadBalancerID.String())
 
 					if err := s.processLoadBalancerChangeDelete(lb); err != nil {
 						s.Logger.Errorw("handler unable to release address from loadbalancer", "error", err, "loadbalancer", lb.LoadBalancerID.String())
-						msg.Nack()
+
+						if nakErr := msg.Nak(nakDelay); nakErr != nil {
+							s.Logger.Errorw("error occurred while nacking", "error", nakErr)
+						}
 					}
 				default:
-					s.Logger.Debugw("Ignoring event", "loadbalancer", lb.LoadBalancerID.String(), "message", msg.Payload)
+					s.Logger.Debugw("Ignoring event", "loadbalancer", lb.LoadBalancerID.String(), "message", m)
 				}
 			}
 		}
 		// we need to Acknowledge that we received and processed the message,
 		// otherwise, it will be resent over and over again.
-		msg.Ack()
+		if ackErr := msg.Ack(); ackErr != nil {
+			s.Logger.Errorw("error occurred while acking", "error", ackErr)
+		}
 	}
 }
 
