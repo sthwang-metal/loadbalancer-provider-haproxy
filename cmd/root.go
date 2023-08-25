@@ -74,12 +74,12 @@ func initConfig() {
 
 	setupAppConfig()
 
-	logger = loggingx.InitLogger(appName, config.AppConfig.Logging)
-
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+
+	logger = loggingx.InitLogger(appName, config.AppConfig.Logging)
 }
 
 // setupAppConfig loads our config.AppConfig struct with the values bound by
