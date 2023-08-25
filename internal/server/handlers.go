@@ -33,9 +33,7 @@ func (s *Server) processChange(msg events.Message[events.ChangeMessage]) {
 
 	m := msg.Message()
 
-	ctx := m.GetTraceContext(s.Context)
-
-	ctx, span := otel.Tracer(instrumentationName).Start(ctx, "processChange")
+	ctx, span := otel.Tracer(instrumentationName).Start(m.GetTraceContext(s.Context), "processChange")
 	defer span.End()
 
 	if slices.ContainsFunc(m.AdditionalSubjectIDs, s.LocationCheck) || len(s.Locations) == 0 {

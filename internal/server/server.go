@@ -11,7 +11,7 @@ import (
 	"go.infratographer.com/ipam-api/pkg/ipamclient"
 )
 
-// instrumentationName
+// instrumentationName is a unique package name used for tracing
 const instrumentationName = "go.infratographer.com/loadbalancer-provider-haproxy/server"
 
 // Server holds options for server connectivity and settings
