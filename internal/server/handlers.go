@@ -38,7 +38,7 @@ func (s *Server) processChange(msg events.Message[events.ChangeMessage]) {
 
 	if slices.ContainsFunc(m.AdditionalSubjectIDs, s.LocationCheck) || len(s.Locations) == 0 {
 		if m.EventType != string(events.DeleteChangeType) {
-			lb, err = loadbalancer.NewLoadBalancer(s.Context, s.Logger, s.APIClient, m.SubjectID, m.AdditionalSubjectIDs)
+			lb, err = loadbalancer.NewLoadBalancer(ctx, s.Logger, s.APIClient, m.SubjectID, m.AdditionalSubjectIDs)
 			if err != nil {
 				s.Logger.Errorw("unable to initialize loadbalancer", "error", err, "messageID", msg.ID(), "message", m)
 
