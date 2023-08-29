@@ -39,7 +39,7 @@ func (s *Server) processLoadBalancerChangeCreate(ctx context.Context, lb *loadba
 }
 
 func (s *Server) processLoadBalancerChangeDelete(ctx context.Context, lb *loadbalancer.LoadBalancer) error {
-	ctx, span := otel.GetTracerProvider().Tracer(instrumentationName).Start(ctx, "processLoadBalancerChangeCreate")
+	ctx, span := otel.Tracer(instrumentationName).Start(ctx, "processLoadBalancerChangeDelete")
 	defer span.End()
 
 	if err := ipam.ReleaseAddress(ctx, s.IPAMClient, s.Logger, lb.LoadBalancerID.String()); err != nil {
