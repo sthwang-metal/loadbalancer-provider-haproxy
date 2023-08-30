@@ -104,8 +104,8 @@ func (s *Server) processChange(msg events.Message[events.ChangeMessage]) {
 		}
 		// we need to Acknowledge that we received and processed the message,
 		// otherwise, it will be resent over and over again.
-		if ackErr := msg.Ack(); ackErr != nil {
-			s.Logger.Errorw("error occurred while acking", "error", ackErr)
+		if err = msg.Ack(); err != nil {
+			s.Logger.Errorw("unable to ack message", "error", err, "messageID", msg.ID(), "message", m)
 		}
 	}
 }
