@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/exp/slices"
 
 	"go.infratographer.com/x/events"
@@ -70,6 +71,13 @@ func (s *Server) processChange(msg events.Message[events.ChangeMessage]) {
 			}
 
 			if lb != nil && lb.LbType != loadbalancer.TypeNoLB {
+				span.SetAttributes(
+					attribute.String("loadbalancer.id", lb.LoadBalancerID.String()),
+					attribute.String("message.event", m.EventType),
+					attribute.String("message.id", msg.ID()),
+					attribute.String("message.subject", m.SubjectID.String()),
+				)
+
 				switch {
 				case m.EventType == string(events.CreateChangeType) && lb.LbType == loadbalancer.TypeLB:
 					s.Logger.Debugw("requesting address for loadbalancer", "loadbalancer", lb.LoadBalancerID.String())
@@ -80,6 +88,8 @@ func (s *Server) processChange(msg events.Message[events.ChangeMessage]) {
 						if err = msg.Nak(defaultNakDelay); err != nil {
 							s.Logger.Errorw("unable to nack message", "error", err, "messageID", msg.ID(), "message", m)
 						}
+
+						return
 					}
 				case m.EventType == string(events.DeleteChangeType) && lb.LbType == loadbalancer.TypeLB:
 					s.Logger.Debugw("releasing address from loadbalancer", "loadbalancer", lb.LoadBalancerID.String())
@@ -90,18 +100,15 @@ func (s *Server) processChange(msg events.Message[events.ChangeMessage]) {
 						if err = msg.Nak(defaultNakDelay); err != nil {
 							s.Logger.Errorw("unable to nack message", "error", err, "messageID", msg.ID(), "message", m)
 						}
+
+						return
 					}
 				default:
 					s.Logger.Debugw("Ignoring event", "loadbalancer", lb.LoadBalancerID.String(), "message", m)
 				}
 			}
-
-			// we need to Acknowledge that we received and processed the message,
-			// otherwise, it will be resent over and over again.
-			if err = msg.Ack(); err != nil {
-				s.Logger.Errorw("unable to ack message", "error", err, "messageID", msg.ID(), "message", m)
-			}
 		}
+
 		// we need to Acknowledge that we received and processed the message,
 		// otherwise, it will be resent over and over again.
 		if err = msg.Ack(); err != nil {
